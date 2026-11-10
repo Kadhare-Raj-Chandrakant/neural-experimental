@@ -78,6 +78,23 @@ def _normalize(raw: str) -> str:
     return raw  
 
 def _launch_windows(app_name: str) -> bool:
+    app_lower = app_name.lower().strip()
+
+    # Specialized Windows 11 UWP Apps (like Paint) that require Start Menu activation
+    if app_lower in ("paint", "mspaint", "mspaint.exe"):
+        try:
+            import pyautogui
+            from actions.coordinate_grounding import attach_interactive_desktop
+            attach_interactive_desktop()
+            pyautogui.press("win")
+            time.sleep(0.7)
+            pyautogui.write("paint", interval=0.06)
+            time.sleep(0.7)
+            pyautogui.press("enter")
+            time.sleep(2.0)
+            return True
+        except Exception as e:
+            print(f"[open_app] Paint start menu launch error: {e}")
 
     if shutil.which(app_name) or shutil.which(app_name.split(".")[0]):
         try:

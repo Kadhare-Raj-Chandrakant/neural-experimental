@@ -45,7 +45,9 @@ htmlcov/
 
 # Virtual environments
 venv/
+venv*/
 .venv/
+.venv*/
 env/
 ENV/
 
@@ -87,3 +89,9 @@ Desktop.ini
 *.log
 scratch/
 .system_generated/
+
+# Model weights
+*.pt
+*.pth
+*.onnx
+*.bin
