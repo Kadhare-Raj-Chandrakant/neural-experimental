@@ -1,0 +1,10 @@
+{
+    "gemini_api_key": "YOUR_GEMINI_API_KEY_HERE",
+    "os_system": "windows",
+    "morning_brief_enabled": false,
+    "mode": "live",
+    "llm_provider": "ollama",
+    "llm_model": "qwen2.5:7b",
+    "tts_engine": "phonon",
+    "tts_voice": "Zoey"
+}
