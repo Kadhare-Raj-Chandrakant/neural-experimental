@@ -359,6 +359,47 @@ class WindowIdentifier:
         return info
 
     @classmethod
+    def bring_to_front(cls, app_or_title: str) -> bool:
+        """Finds any visible window matching app_or_title and brings it to the top foreground."""
+        if platform.system() != "Windows" or not app_or_title:
+            return False
+        try:
+            import ctypes
+            u32 = ctypes.windll.user32
+            k32 = ctypes.windll.kernel32
+            target_hwnd = None
+            target = app_or_title.lower().strip()
+
+            def enum_cb(hwnd, lparam):
+                nonlocal target_hwnd
+                if u32.IsWindowVisible(hwnd):
+                    length = u32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buf = ctypes.create_unicode_buffer(length + 1)
+                        u32.GetWindowTextW(hwnd, buf, length + 1)
+                        if target in buf.value.lower():
+                            target_hwnd = hwnd
+                            return False
+                return True
+
+            CMPFUNC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+            u32.EnumWindows(CMPFUNC(enum_cb), 0)
+
+            if target_hwnd:
+                u32.ShowWindow(target_hwnd, 9)  # SW_RESTORE = 9
+                fore_hwnd = u32.GetForegroundWindow()
+                cur_tid = k32.GetCurrentThreadId()
+                fore_tid = u32.GetWindowThreadProcessId(fore_hwnd, None)
+                u32.AttachThreadInput(cur_tid, fore_tid, True)
+                u32.SetForegroundWindow(target_hwnd)
+                u32.BringWindowToTop(target_hwnd)
+                u32.AttachThreadInput(cur_tid, fore_tid, False)
+                return True
+        except Exception as e:
+            print(f"[WindowIdentifier] bring_to_front error: {e}")
+        return False
+
+    @classmethod
     def wait_for_target_window(cls, app_or_title: str, timeout: float = 3.0) -> bool:
         """Waits up to timeout seconds for a window matching app_or_title to become active."""
         if not app_or_title:
@@ -370,7 +411,8 @@ class WindowIdentifier:
             info = cls.get_foreground_window_info()
             if target in info["title"].lower():
                 return True
-            time.sleep(0.15)
+            cls.bring_to_front(target)
+            time.sleep(0.2)
         return False
 
 

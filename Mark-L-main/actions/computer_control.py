@@ -371,6 +371,10 @@ def _focus_window(title: str) -> str:
 
     if os_name == "windows":
         try:
+            from actions.coordinate_grounding import WindowIdentifier
+            if WindowIdentifier.bring_to_front(title):
+                time.sleep(0.3)
+                return f"Focused window: {title}"
             script = f'(New-Object -ComObject WScript.Shell).AppActivate("{title}")'
             subprocess.run(
                 ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],

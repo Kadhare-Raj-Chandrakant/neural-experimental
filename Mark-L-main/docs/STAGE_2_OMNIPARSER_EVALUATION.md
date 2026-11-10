@@ -120,3 +120,4 @@ Executed live against the actual Windows 11 Paint application (`Untitled - Paint
 * **Isolated environment setup:** PASS (`.venv_omniparser` created without modifying primary packages)
 * **Set-of-Marks badge grounding on Paint:** PASS (Rectangle: `[4]`, Canvas: `[14]`, Share: `[NONE]`)
 * **Status:** **STAGE 2 VERIFIED AND ACCEPTED.**
+
