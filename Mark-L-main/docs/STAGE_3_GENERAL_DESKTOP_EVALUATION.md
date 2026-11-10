@@ -54,7 +54,7 @@ All tests were executed on the target hardware (AMD Ryzen 7 4800H 16-thread host
 
 ## 2. 50-Frame Sustained Stress & Latency Distribution Test
 
-To evaluate sustained continuous performance and detect any memory leaks, 50 continuous full-frame 1080p desktop grounding cycles were executed back-to-back.
+To evaluate sustained continuous performance and detect potential memory instability, 50 continuous full-frame 1080p desktop grounding cycles were executed back-to-back.
 
 ### Measured Metrics Summary Table
 
@@ -67,7 +67,7 @@ To evaluate sustained continuous performance and detect any memory leaks, 50 con
 | **End-to-End Latency (P50 / Median)** | **78.50 ms** | < 100 ms | **PASS** |
 | **End-to-End Latency (P90)** | **94.00 ms** | < 120 ms | **PASS** |
 | **End-to-End Latency (P95)** | **94.00 ms** | < 130 ms | **PASS** |
-| **End-to-End Latency (P99)** | **117.65 ms** | < 150 ms | **PASS** |
+| **End-to-End Latency (P99)** | **117.65 ms** *(observed sample estimate)* | < 150 ms | **PASS** |
 | **Min / Max Latency** | 63.00 ms / 125.00 ms | N/A | STABLE |
 | **Standard Deviation** | 10.94 ms | N/A | Low Jitter |
 | **1080p Screen Capture Time (Mean)**| 41.84 ms | N/A | Real Desktop |
@@ -75,7 +75,7 @@ To evaluate sustained continuous performance and detect any memory leaks, 50 con
 | **Post-Processing / Set-of-Marks** | 0.32 ms | < 5 ms | Ultra-low |
 | **Process RAM (Warm Start)** | 384.85 MB | N/A | Baseline |
 | **Process RAM (Final)** | 414.43 MB | N/A | Plateaued |
-| **RAM Delta (Frames 10 to 50)** | **-3.60 MB** | 0 MB leak | **ZERO LEAK** |
+| **Memory Leak Observation** | **Stabilized** (Frame 10: 418.0 MB $\rightarrow$ Frame 50: 414.4 MB) | No runaway growth | **PASS** |
 | **Initial GPU VRAM** | 153.00 MB | 4096 MB budget | Baseline |
 | **Final GPU VRAM** | 153.00 MB | 4096 MB budget | Baseline |
 | **GPU VRAM Delta** | **+0.00 MB** | 0 MB GPU consumption | **ZERO VRAM** |
@@ -83,11 +83,26 @@ To evaluate sustained continuous performance and detect any memory leaks, 50 con
 
 ---
 
-## 3. Key Findings
+## 3. Technical Qualifications & Scope Limitations
 
-1. **General Desktop Visual Grounding is Solved:** The visual grounding architecture generalizes seamlessly across text editors, file managers, and modern web browsers without memorizing coordinates or relying on static application layouts.
-2. **Compound Actions vs. State Transitions:**
-   - Tightly coupled operations (`click text area -> smart_type`) execute reliably on a single grounded decision.
-   - State-changing actions (menu dropdowns, navigation transitions) trigger mandatory fresh visual grounding and visual delta verification before any further action is allowed.
-3. **11.7 FPS Real-Time Grounding Feasibility:** Sustained 11.68 FPS with P90 latency of 94.00 ms demonstrates that local visual perception is practical and robust on mid-range hardware without overwhelming system resources.
-4. **Zero GPU VRAM Impact:** The local vision layer runs entirely across host CPU threads, leaving the complete 4 GB VRAM of the GTX 1650 unencumbered.
+1. **Memory Profile Qualification:** 
+   The initial process memory shifted by +29.58 MB from warm start to final measurement due to internal PyTorch buffer allocation during the first batch. Across active frames 10 through 50, memory plateaued and slightly declined (-3.60 MB). While no sustained memory growth was observed during the 50-frame benchmark and process memory appeared to stabilize, a 50-frame sample does not constitute formal mathematical proof of zero long-term memory leaks.
+2. **P99 Tail Latency Qualification:**
+   The observed P99 of 117.65 ms is a useful upper-tail indicator for this 50-frame run, but sample size limitations mean it must be treated as an empirical estimate rather than an absolute long-run SLA guarantee.
+3. **Application Generalization Scope:**
+   Successful execution across Windows Notepad, File Explorer, and Brave demonstrates cross-application generalization across text editing, file management, and browser navigation paradigms. It does not establish universal compatibility with all arbitrary Windows interfaces. Highly complex GUI patterns (deeply nested menus, modal dialogs, custom tree views, dynamic scroll views, overlapping windows, and high-DPI scaling) remain to be stressed in Stage 4.
+4. **Thermal Stability Scope:**
+   The 50-frame test establishes measured burst throughput (11.68 FPS), but long-duration thermal stability over hours of continuous background operation requires extended burn-in testing.
+
+---
+
+## 4. Stage 3 Verdict & Architecture Freeze
+
+* **Overall Verdict:** **STAGE 3 ACCEPTED AND FORMALLY FROZEN.**
+* **Architectural Preservation:**
+  * No additional vision model introduced.
+  * No replacement of Gemini planning model.
+  * Grounding pipeline preserved: Local Set-of-Marks detection + Gemini planning + Visual Grounding Gate + CoordinateTransformer + Post-action visual delta verifier.
+  * Compound actions strictly restricted to tightly coupled atomic operations.
+  * Fresh visual observations strictly enforced after state-changing transitions.
+  * Emergency STOP and view-only safety gates remain mandatory and active.
