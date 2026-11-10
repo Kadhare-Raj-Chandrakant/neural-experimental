@@ -318,3 +318,122 @@ class VisualVerifier:
         has_changed = delta >= threshold_percent
         msg = f"{delta}% screen delta detected" if has_changed else f"No significant screen change ({delta}% delta)"
         return has_changed, delta, msg
+
+
+class WindowIdentifier:
+    """
+    Identifies the active foreground window and application state on Windows.
+    Prevents blind interaction before the target application is focused and ready.
+    """
+
+    @classmethod
+    def get_foreground_window_info(cls) -> Dict[str, Any]:
+        """Returns {hwnd, title, rect, pid} for the current active foreground window."""
+        info = {"hwnd": 0, "title": "", "rect": None, "pid": 0}
+        if platform.system() == "Windows":
+            try:
+                import ctypes
+                import ctypes.wintypes
+                u32 = ctypes.windll.user32
+                hwnd = u32.GetForegroundWindow()
+                if hwnd:
+                    length = u32.GetWindowTextLengthW(hwnd)
+                    buf = ctypes.create_unicode_buffer(length + 1)
+                    u32.GetWindowTextW(hwnd, buf, length + 1)
+                    title = buf.value
+
+                    rect = ctypes.wintypes.RECT()
+                    u32.GetWindowRect(hwnd, ctypes.byref(rect))
+
+                    pid = ctypes.c_ulong()
+                    u32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+
+                    info = {
+                        "hwnd": hwnd,
+                        "title": title,
+                        "rect": (rect.left, rect.top, max(0, rect.right - rect.left), max(0, rect.bottom - rect.top)),
+                        "pid": pid.value,
+                    }
+            except Exception as e:
+                print(f"[WindowIdentifier] Error getting foreground window: {e}")
+        return info
+
+    @classmethod
+    def wait_for_target_window(cls, app_or_title: str, timeout: float = 3.0) -> bool:
+        """Waits up to timeout seconds for a window matching app_or_title to become active."""
+        if not app_or_title:
+            return True
+        import time
+        target = app_or_title.lower().strip()
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < timeout:
+            info = cls.get_foreground_window_info()
+            if target in info["title"].lower():
+                return True
+            time.sleep(0.15)
+        return False
+
+
+class VisualGroundingGate:
+    """
+    Strict Visual Grounding Gate:
+    Enforces Observe -> Understand -> Plan -> Act -> Verify.
+    Prevents blind coordinate execution and ensures every action is grounded
+    in a fresh, verified screen observation.
+    """
+
+    @classmethod
+    def ensure_fresh_observation(cls) -> Optional[Any]:
+        """Ensures that screen observation is active and returns a fresh captured frame."""
+        try:
+            from actions.vision_pipeline import VisionSessionManager
+            vsm = VisionSessionManager.get_instance()
+            if not vsm.observation_active and not vsm.is_paused:
+                vsm.start_observation()
+            vsm.scheduler.request_burst(3.0)
+        except Exception:
+            pass
+
+        return VisualVerifier.capture_frame()
+
+    @classmethod
+    def validate_action(
+        cls,
+        action: str,
+        parameters: Dict[str, Any],
+    ) -> Tuple[bool, str, Optional[Any]]:
+        """
+        Validates that an action has visual grounding before execution.
+        Returns: (allowed: bool, reason: str, fresh_frame: Optional[PIL.Image])
+        """
+        params = parameters or {}
+        fresh_frame = cls.ensure_fresh_observation()
+        if fresh_frame is None:
+            return False, "Visual Grounding Gate: Screen capture unavailable. Cannot proceed blind.", None
+
+        # Check foreground window if a target application / title is specified
+        target_title = params.get("title") or params.get("target_app")
+        if target_title:
+            fw = WindowIdentifier.get_foreground_window_info()
+            if target_title.lower() not in fw["title"].lower():
+                # Attempt short wait for window focus
+                found = WindowIdentifier.wait_for_target_window(target_title, timeout=1.5)
+                if not found:
+                    fw_now = WindowIdentifier.get_foreground_window_info()
+                    return False, f"Target window '{target_title}' is not active (active: '{fw_now['title']}'). Cannot interact blindly.", fresh_frame
+
+        # Reject ungrounded blind clicks (actions requiring target where neither coordinates nor description provided)
+        if action in ("click", "double_click", "right_click", "drag"):
+            desc = params.get("description")
+            x, y = params.get("x"), params.get("y")
+            x1, y1 = params.get("x1"), params.get("y1")
+            
+            if action == "drag":
+                if not (x1 is not None and y1 is not None) and not desc:
+                    return False, "Visual Grounding Gate: Drag action missing coordinates or description.", fresh_frame
+            else:
+                if not desc and (x is None or y is None):
+                    return False, "Visual Grounding Gate: Action requires either a target element description or grounded coordinates.", fresh_frame
+
+        return True, "OK", fresh_frame
+

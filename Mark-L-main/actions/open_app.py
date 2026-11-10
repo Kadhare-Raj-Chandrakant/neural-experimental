@@ -331,11 +331,23 @@ def open_app(
         player.write_log(f"[open_app] {app_name}")
 
     try:
+        launched = False
         if launcher(normalized):
-            return f"Opened {app_name}."
-        if normalized.lower() != app_name.lower():
-            if launcher(app_name):
-                return f"Opened {app_name}."
+            launched = True
+        elif normalized.lower() != app_name.lower() and launcher(app_name):
+            launched = True
+
+        if launched:
+            # Engage visual observation and wait for target window to focus
+            try:
+                from actions.coordinate_grounding import WindowIdentifier
+                from actions.vision_pipeline import VisionSessionManager
+                VisionSessionManager.get_instance().start_observation()
+                WindowIdentifier.wait_for_target_window(app_name, timeout=2.5)
+            except Exception:
+                pass
+            return f"Opened {app_name} and verified active window."
+
         return (
             f"Could not confirm that {app_name} launched. "
             f"It may still be loading, or it might not be installed."

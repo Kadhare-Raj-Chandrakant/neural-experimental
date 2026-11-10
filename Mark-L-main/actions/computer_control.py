@@ -537,9 +537,18 @@ def computer_control(
     # Request burst rate on frame scheduler so vision sees action outcome
     vsm.scheduler.request_burst(3.0)
 
+    # Visual Grounding Gate: Enforce Observe -> Understand -> Plan -> Act -> Verify
     should_verify = bool(params.get("verify", False))
     before_img = None
-    if should_verify and action not in ("screenshot", "copy", "status"):
+    if action not in ("screenshot", "copy", "status", "wait"):
+        from actions.coordinate_grounding import VisualGroundingGate, VisualVerifier
+        grounded, g_reason, fresh_img = VisualGroundingGate.validate_action(action, params)
+        if not grounded:
+            print(f"[ComputerControl] [GROUNDING GATE BLOCKED] {g_reason}")
+            return f"Action blocked by Visual Grounding Gate: {g_reason}"
+        if should_verify:
+            before_img = fresh_img
+    elif should_verify:
         try:
             from actions.coordinate_grounding import VisualVerifier
             before_img = VisualVerifier.capture_frame()
