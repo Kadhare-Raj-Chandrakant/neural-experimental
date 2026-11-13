@@ -123,3 +123,120 @@ Do not declare Stage 6 Frozen. Return the evidence for architectural review and 
 * Checkpoint Commit: Pushed to `main`.
 * Stage 6 Status: ACCEPTED at checkpoint f6764f0; formal freeze pending final baseline confirmation.
 
+---
+
+## [Body Subsystem] — Initial Architecture & Environment Assessment
+
+* **Status:** PROPOSED — AWAITING ARCHITECTURAL APPROVAL
+* **Scope:** Feasibility study, hardware diagnostic, 3D avatar technology selection, and integration strategy for JARVIS's physical presence (`body/`) based on approved visual identity assets.
+
+---
+
+### Task Directive: JARVIS — Body Subsystem Initial Assessment
+
+```
+Create a separate body module inside the existing JARVIS project, not an entirely separate project.
+
+That gives her an independent development environment while preserving the connection to JARVIS's existing Brain, voice and desktop-control capabilities.
+Recommended project structure
+Assuming your existing repository is Mark-L-main:
+Mark-L-main/
+│
+├── actions/                 # Existing desktop interaction
+├── brain/                   # Existing intelligence
+├── docs/                    # Existing governance documents
+├── main.py                  # Existing application
+│
+├── body/                    # NEW: JARVIS physical presence
+│   ├── character/
+│   ├── models/
+│   ├── animation/
+│   ├── facial_rig/
+│   ├── lip_sync/
+│   ├── expressions/
+│   ├── rendering/
+│   └── integration/
+│
+├── assets/
+│   └── character/
+│       ├── references/
+│       └── approved/
+│
+└── ...
+
+
+The approved portrait and original reference images should go into assets/character/.
+How to open it in Antigravity
+1. Create the body and assets/character folders.
+2. Put the approved portrait in assets/character/approved/.
+3. Put the original reference images in assets/character/references/.
+4. Open the entire Mark-L-main repository in Antigravity, not just the body folder.
+Our first Antigravity instruction
+Don't ask it to start generating the character immediately. First, make it inspect the existing project and establish the implementation plan.
+JARVIS — Body Subsystem: Initial Assessment
+We are beginning development of JARVIS's visual human presence.
+
+The objective is to create a hyper-realistic anime-inspired 3D adult female digital human, approximately 28 years old.
+
+Approved visual identity:
+- Long silver-white hair.
+- Blue-violet eyes.
+- Mature adult facial proportions.
+- Elegant, refined appearance.
+- Black high-neck outfit.
+- Consistent facial identity based on the approved reference images.
+Your first task is an architecture and environment assessment ONLY.
+1. Inspect the existing JARVIS architecture and technology stack.
+2. Read the existing project constitution, architecture documentation and validation protocols.
+3. Inspect available rendering, 3D animation and GPU capabilities.
+4. Assess suitable technologies for realistic real-time facial animation, rigging, lip synchronization and body movement.
+5. Determine how the body subsystem can communicate with the existing Brain and voice engine.
+6. Identify dependencies, risks and integration boundaries.
+STRICT RULES:
+- Do not modify existing working JARVIS functionality.
+- Do not redesign the Brain.
+- Do not replace existing desktop-control capabilities.
+- Do not install dependencies yet.
+- Do not generate placeholder implementations.
+- Do not begin implementation before presenting the architecture assessment.
+- Keep the body subsystem modular and independently testable.
+Deliver:
+- Environment assessment.
+- Recommended technology stack with reasons.
+- Proposed subsystem architecture.
+- Implementation milestones.
+- Integration strategy.
+- Risks and validation criteria.
+Record the exact prompt and resulting report in docs/CHANGELOG.md, following existing project governance.
+Wait for architectural approval before implementation.
+My recommendation: Let us get this assessment first. We should choose the rendering and animation technology based on what your actual machine can run, rather than committing to an unsuitable stack.
+```
+
+---
+
+### Architecture & Assessment Report
+
+#### 1. Environment Assessment
+* **Hardware Ceiling:** NVIDIA GeForce GTX 1650 (4 GB VRAM), AMD Ryzen 8-core / 16-thread CPU, 16 GB RAM (4.1 GB available), Windows 11 Build 26300.9818 (26H2).
+* **VRAM Budget:** Hard limit of $\le 500\text{ MB}$ for the body subsystem to preserve $\ge 3.5\text{ GB}$ for OmniParser v2 desktop grounding and OS workloads.
+* **Disqualifications:** Unreal Engine 5 Nanite/Lumen disqualified due to 8–16 GB VRAM requirements.
+
+#### 2. Recommended Technology Stack
+* **Model Standard:** VRM 1.0 (glTF 2.0 Binary) with MToon PBR cel-shading, SpringBone hair dynamics, and Apple ARKit 52 facial blendshapes ($\le 65\text{K}$ polygons, $\le 200\text{ MB}$ VRAM).
+* **Rendering Engine:** Dedicated Three.js / WebGL 2.0 viewport powered by `@pixiv/three-vrm` (220–350 MB VRAM, 60 FPS, isolated process/thread).
+* **Lip-Sync:** Dual-mode deterministic phoneme clock (from EdgeTTS/Kokoro) + real-time audio FFT spectral formant analyzer ($< 12\text{ ms}$ latency, $< 1\%$ CPU).
+* **Procedural Animation:** Python state controller for randomized saccades, organic breathing cycle (14 breaths/min), look-at tracking, and cubic Hermite emotional morphing.
+
+#### 3. Integration Strategy
+* Non-invasive asynchronous observer pattern.
+* `core/tts.py` hooked via audio sample tap for real-time visemes without adding audio latency.
+* Brain sends one-way state events (`IDLE`, `LISTENING`, `THINKING`, `SPEAKING`, `EXECUTING`); Body never commands or blocks Brain decisions.
+* Complete fault isolation: rendering crashes cannot crash desktop control or trip safety gates.
+
+#### 4. Project Assets Organized
+* Directory structure created under `Mark-L-main/body/` and `Mark-L-main/assets/character/`.
+* Approved portrait placed at `assets/character/approved/approved_portrait.jpg`.
+* 5 stylistic references placed at `assets/character/references/reference_01.jpg` through `reference_05.jpg`.
+* Full architecture specification preserved in `docs/BODY_SUBSYSTEM_ARCHITECTURE_ASSESSMENT.md`.
+
+
