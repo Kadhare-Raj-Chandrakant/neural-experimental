@@ -83,8 +83,10 @@ def _launch_windows(app_name: str) -> bool:
     # Specialized Windows 11 Apps (like Paint, Notepad)
     if app_lower in ("paint", "mspaint", "mspaint.exe", "notepad", "notepad.exe"):
         try:
-            exe = "notepad.exe" if "notepad" in app_lower else "mspaint.exe"
-            subprocess.Popen(exe, shell=True)
+            if "notepad" in app_lower:
+                subprocess.Popen("explorer.exe shell:AppsFolder\\Microsoft.WindowsNotepad_8wekyb3d8bbwe!App", shell=True)
+            else:
+                subprocess.Popen("mspaint.exe", shell=True)
             time.sleep(1.0)
             from actions.coordinate_grounding import WindowIdentifier
             if WindowIdentifier.bring_to_front("notepad" if "notepad" in app_lower else "paint"):

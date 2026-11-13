@@ -81,6 +81,7 @@ Desktop.ini
 # Memory store & local databases
 **/memory/mem0_store/
 **/memory/long_term.json
+**/memory/task_state.json*
 *.sqlite
 *.sqlite3
 *.db

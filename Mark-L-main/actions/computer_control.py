@@ -544,7 +544,7 @@ def computer_control(
     # Visual Grounding Gate: Enforce Observe -> Understand -> Plan -> Act -> Verify
     should_verify = bool(params.get("verify", False))
     before_img = None
-    if action not in ("screenshot", "copy", "status", "wait"):
+    if action not in ("screenshot", "copy", "status", "wait", "focus_window"):
         from actions.coordinate_grounding import VisualGroundingGate, VisualVerifier
         grounded, g_reason, fresh_img = VisualGroundingGate.validate_action(action, params)
         if not grounded:
