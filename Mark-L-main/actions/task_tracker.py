@@ -53,6 +53,8 @@ class SubGoal:
         precheck_spec: Optional[Dict[str, Any]] = None,
         status: str = StepStatus.PENDING,
         result_evidence: Optional[Dict[str, Any]] = None,
+        depends_on: Optional[List[int]] = None,
+        invalidation_reason: Optional[str] = None,
     ):
         self.step_id = step_id
         self.description = description
@@ -62,17 +64,36 @@ class SubGoal:
         self.precheck_spec = precheck_spec or {}
         self.status = status
         self.result_evidence = result_evidence or {}
+        self.depends_on = depends_on or []
+        self.invalidation_reason = invalidation_reason
 
     def to_dict(self) -> Dict[str, Any]:
+        # JSON-safe sanitization for non-serializable fields (e.g. callables in specs)
+        safe_vspec = {}
+        for k, v in self.verification_spec.items():
+            if callable(v):
+                safe_vspec[k] = f"<callable {getattr(v, '__name__', 'predicate')}>"
+            else:
+                safe_vspec[k] = v
+
+        safe_pspec = {}
+        for k, v in self.precheck_spec.items():
+            if callable(v):
+                safe_pspec[k] = f"<callable {getattr(v, '__name__', 'predicate')}>"
+            else:
+                safe_pspec[k] = v
+
         return {
             "step_id": self.step_id,
             "description": self.description,
             "action_intent": self.action_intent,
             "verification_type": self.verification_type,
-            "verification_spec": self.verification_spec,
-            "precheck_spec": self.precheck_spec,
+            "verification_spec": safe_vspec,
+            "precheck_spec": safe_pspec,
             "status": self.status,
             "result_evidence": self.result_evidence,
+            "depends_on": self.depends_on,
+            "invalidation_reason": self.invalidation_reason,
         }
 
     @classmethod
@@ -86,6 +107,8 @@ class SubGoal:
             precheck_spec=data.get("precheck_spec", {}),
             status=data.get("status", StepStatus.PENDING),
             result_evidence=data.get("result_evidence", {}),
+            depends_on=data.get("depends_on", []),
+            invalidation_reason=data.get("invalidation_reason"),
         )
 
 
@@ -320,6 +343,17 @@ class TaskTracker:
                     return False, composite_evidence, f"Composite sub-verification failed: {msg}"
             return True, composite_evidence, "All composite verification criteria passed."
 
+        # 6. Custom or State-Memory Predicate
+        if v_type == "custom":
+            predicate = spec.get("predicate")
+            if callable(predicate):
+                try:
+                    ok = bool(predicate(evidence_context={"before": before_state, "after": after_state}))
+                except TypeError:
+                    ok = bool(predicate())
+                return ok, {"custom": ok}, "Custom predicate satisfied." if ok else "Custom predicate failed."
+            return True, {"custom": True}, "Custom verification passed."
+
         return False, {}, f"Unknown verification type: {v_type}"
 
     # ----------------------------------------------------------------
@@ -422,6 +456,8 @@ class TaskTracker:
         # 3. EXECUTION
         if executor:
             res = executor(current_sg.action_intent)
+            if isinstance(res, dict):
+                self.state_memory.update(res)
         else:
             from actions.computer_control import computer_control
             res = computer_control(current_sg.action_intent)
