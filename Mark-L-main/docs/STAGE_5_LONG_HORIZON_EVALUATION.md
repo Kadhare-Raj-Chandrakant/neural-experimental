@@ -47,7 +47,16 @@ $$\text{PRECHECK} \longrightarrow \text{ACTION\_INTENT} \longrightarrow \text{EX
 
 ---
 
-## 3. Official Milestone Record
+## 3. Technical Qualifications & Scope Boundaries
+
+1. **Crash Recovery Coverage:** One simulated crash scenario demonstrates the reconciliation mechanism, not recovery from every conceivable crash or power-loss point.
+2. **Atomic Persistence Scope:** `os.replace` provides atomic file replacement under appropriate filesystem conditions, but does not by itself guarantee protection against every hardware power-loss or raw storage-corruption scenario.
+3. **Zero Duplication Scope:** The report establishes zero duplicate execution in Benchmark 5B; it does not claim universal mathematical guarantees of exactly-once execution across all arbitrary desktop actions.
+4. **Concurrency Limitations:** The supplied evidence validates sequential multi-step execution; it does not establish safe simultaneous execution of multiple independent concurrent tasks.
+
+---
+
+## 4. Official Milestone Record
 
 | Milestone | Scope | Status |
 | :--- | :--- | :--- |
@@ -55,15 +64,19 @@ $$\text{PRECHECK} \longrightarrow \text{ACTION\_INTENT} \longrightarrow \text{EX
 | **Stage 2 — OmniParser Integration** | Local Set-of-Marks detection + Gemini planning; Paint acceptance test | **Frozen** |
 | **Stage 3 — Multi-Application Generalization** | Notepad, File Explorer, Browser; 50-frame stress test & latency profiling | **Frozen** |
 | **Stage 4 — Reliability & Adversarial Testing** | 8 adversarial failure modes; stale targets, geometry shifts, hung apps, emergency stop | **Frozen** |
-| **Stage 5 — Long-Horizon Task Execution** | Persistent state, sub-goal tracking, crash reconciliation, holistic verification | **Accepted** |
+| **Stage 5 — Long-Horizon Task Execution** | Persistent state, sub-goal tracking, crash reconciliation, holistic verification | **Frozen** |
+| **Stage 6 — Contextual Intelligence & Adaptive Planning** | Autonomous goal decomposition, dynamic replanning, dependency graphs, intent preservation | **Next** |
 
 ---
 
-## 4. Governance & Architecture Preservation
+## 5. Governance & Architecture Preservation
 
 * **100% Additive:** Built on top of the accepted Mark-L foundation without modifying or refactoring accepted Stage 1–4 components.
 * **No Additional Models:** Reuses OmniParser v2 Set-of-Marks eyes + Gemini 3.5 Flash-Lite brain.
 * **Checkpoints Preserved in Git History:**
+  * `5ad4360`: Stage 5 Implementation & Benchmarks
   * `936e757`: Stage 4 Frozen
   * `e68b711`: Stage 4 Implementation
-  * Stage 5 checkpoint committed and pushed.
+  * `58b4a71`: Stage 3 Frozen
+  * `64fe525`: Stage 3 Implementation
+* **Stage 5 Status:** **ACCEPTED AND FORMALLY FROZEN.**
