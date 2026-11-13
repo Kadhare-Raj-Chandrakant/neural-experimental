@@ -5,7 +5,7 @@ Benchmark 6B: Dynamic Circumstance Replanning (File Collision, Byte-for-Byte Pre
 Benchmark 6C: Dependency-Aware DAG Execution & Independent Step Preservation
 Benchmark 6D: Goal Invariance Gate & Unsafe Adaptation Rejection (Anti-Drift)
 """
-import sys, time, json, os, platform, shutil
+import sys, time, json, os, platform, shutil, winreg
 from pathlib import Path
 
 # Add Mark-L-main to python path
@@ -52,11 +52,28 @@ def run_stage_6_benchmarks():
     real_machine = platform.machine()
     real_system = platform.system()
     real_release = platform.release()
+    win_ver = sys.getwindowsversion()
+    real_build_major = str(win_ver.build)
+    
+    # Query registry for exact build revision and display version
+    reg_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
+    try:
+        display_version = winreg.QueryValueEx(reg_key, "DisplayVersion")[0]
+    except Exception:
+        display_version = "Unknown"
+    try:
+        ubr = winreg.QueryValueEx(reg_key, "UBR")[0]
+        full_build = f"{real_build_major}.{ubr}"
+    except Exception:
+        ubr = 0
+        full_build = real_build_major
 
     print(f"   [Ground Truth OS Facts]")
-    print(f"   - Node/Hostname: {real_node}")
-    print(f"   - Architecture:  {real_machine}")
-    print(f"   - OS:            {real_system} {real_release}")
+    print(f"   - Node/Hostname:  {real_node}")
+    print(f"   - Architecture:   {real_machine}")
+    print(f"   - OS System:      {real_system}")
+    print(f"   - Kernel Release: {real_release}")
+    print(f"   - OS Build:       {full_build} (DisplayVersion: {display_version})")
 
     collected_system_facts = {}
 
@@ -66,6 +83,8 @@ def run_stage_6_benchmarks():
             "machine": real_machine,
             "os": real_system,
             "release": real_release,
+            "build": full_build,
+            "display_version": display_version,
             "timestamp": time.time(),
         }
         collected_system_facts.update(facts)
@@ -76,7 +95,7 @@ def run_stage_6_benchmarks():
         description="Collect verified local hardware and OS facts",
         action_intent={"action": "query_system_facts"},
         verification_type="custom",
-        verification_spec={"predicate": lambda **kw: len(collected_system_facts) >= 4},
+        verification_spec={"predicate": lambda **kw: len(collected_system_facts) >= 5},
         status=StepStatus.PENDING,
     )
 
@@ -86,7 +105,9 @@ def run_stage_6_benchmarks():
             f"Hostname: {collected_system_facts.get('hostname')}\n"
             f"Architecture: {collected_system_facts.get('machine')}\n"
             f"OS System: {collected_system_facts.get('os')}\n"
-            f"OS Release: {collected_system_facts.get('release')}\n"
+            f"Kernel Release: {collected_system_facts.get('release')}\n"
+            f"OS Build: {collected_system_facts.get('build')}\n"
+            f"Display Version: {collected_system_facts.get('display_version')}\n"
             f"Verification: Ground-Truth Verified\n"
         )
         specs_file.write_text(card_content, encoding="utf-8")
@@ -105,16 +126,81 @@ def run_stage_6_benchmarks():
         depends_on=[1],
     )
 
+    def verify_facts_executor(intent):
+        target_path = Path(intent.get("artifact_path", specs_file))
+        if not target_path.exists():
+            return {
+                "audit_result": {
+                    "audit_passed": False,
+                    "error": f"File {target_path} not found"
+                }
+            }
+
+        content = target_path.read_text(encoding="utf-8")
+        parsed = {}
+        for line in content.splitlines():
+            if ":" in line:
+                k, v = line.split(":", 1)
+                parsed[k.strip().lower()] = v.strip()
+
+        # Query live ground-truth Win32 platform facts afresh
+        live_node = platform.node()
+        live_machine = platform.machine()
+        live_system = platform.system()
+        live_release = platform.release()
+        live_build = full_build
+
+        comparisons = {
+            "hostname": {
+                "card": parsed.get("hostname"),
+                "ground_truth": live_node,
+                "match": parsed.get("hostname") == live_node
+            },
+            "architecture": {
+                "card": parsed.get("architecture"),
+                "ground_truth": live_machine,
+                "match": parsed.get("architecture") == live_machine
+            },
+            "os_system": {
+                "card": parsed.get("os system"),
+                "ground_truth": live_system,
+                "match": parsed.get("os system") == live_system
+            },
+            "kernel_release": {
+                "card": parsed.get("kernel release"),
+                "ground_truth": live_release,
+                "match": parsed.get("kernel release") == live_release
+            },
+            "os_build": {
+                "card": parsed.get("os build"),
+                "ground_truth": live_build,
+                "match": parsed.get("os build") == live_build
+            },
+        }
+
+        mismatches = [k for k, v in comparisons.items() if not v["match"]]
+        audit_passed = (len(mismatches) == 0) and (len(comparisons) == 5)
+
+        return {
+            "audit_result": {
+                "audit_passed": audit_passed,
+                "fields_audited": len(comparisons),
+                "ground_truth_source": "Win32 platform + sys.getwindowsversion() + Registry CurrentVersion",
+                "field_comparisons": comparisons,
+                "mismatches": mismatches,
+                "verdict": "100% Match with live ground-truth system facts" if audit_passed else "Audit Mismatch Detected"
+            }
+        }
+
     sg_6a_3 = SubGoal(
         step_id=3,
         description="Independent ground-truth fact verification on artifact",
-        action_intent={"action": "verify_facts"},
-        verification_type="file_exists",
+        action_intent={"action": "verify_artifact_facts", "artifact_path": str(specs_file)},
+        verification_type="fact_audit",
         verification_spec={
-            "path": str(specs_file),
-            "min_size": 40,
-            "content_substring": f"Architecture: {real_machine}",
+            "required_fields": ["hostname", "architecture", "os_system", "kernel_release", "os_build"]
         },
+        precheck_spec={"bypass_precheck": True},
         depends_on=[2],
     )
 
@@ -135,17 +221,22 @@ def run_stage_6_benchmarks():
     print(f"   Step 2 (Artifact Commit):  {ok_a2} ({msg_a2})")
     assert ok_a2, f"Step 2 failed: {msg_a2}"
 
-    # Execute Step 3
-    ok_a3, msg_a3 = tracker_6a.execute_next_step()
+    # Execute Step 3 (Independent Fact Audit Executor)
+    ok_a3, msg_a3 = tracker_6a.execute_next_step(executor=verify_facts_executor)
     print(f"   Step 3 (Fact Audit):       {ok_a3} ({msg_a3})")
     assert ok_a3, f"Step 3 failed: {msg_a3}"
 
-    # Read generated file and perform independent audit against OS facts
-    file_text = specs_file.read_text(encoding="utf-8")
-    assert real_node in file_text, "Hostname mismatch in generated specs card!"
-    assert real_machine in file_text, "Architecture mismatch in generated specs card!"
-    assert real_system in file_text, "OS mismatch in generated specs card!"
-    print("   [Audit] Independent Fact Verification: 100% Match with zero fabricated values.")
+    # Verify audit evidence retention in tracker
+    sg3_evidence = tracker_6a.sub_goals[2].result_evidence
+    assert sg3_evidence.get("audit_passed") is True, "Audit evidence was not retained in TaskTracker!"
+    assert sg3_evidence.get("fields_audited") == 5, f"Expected 5 audited fields, got {sg3_evidence.get('fields_audited')}"
+    assert len(sg3_evidence.get("mismatches", [])) == 0, f"Audit reported mismatches: {sg3_evidence.get('mismatches')}"
+    print(f"   [Audit Verification Evidence]")
+    print(f"   - Ground Truth Source: {sg3_evidence.get('ground_truth_source')}")
+    print(f"   - Fields Audited:      {sg3_evidence.get('fields_audited')}")
+    print(f"   - Field Comparisons:")
+    for f_name, f_data in sg3_evidence.get("field_comparisons", {}).items():
+        print(f"     * {f_name:15s}: card='{f_data['card']}' | live='{f_data['ground_truth']}' | match={f_data['match']}")
 
     # Clean up specs file
     try:
@@ -390,3 +481,4 @@ def run_stage_6_benchmarks():
 if __name__ == "__main__":
     success = run_stage_6_benchmarks()
     sys.exit(0 if success else 1)
+

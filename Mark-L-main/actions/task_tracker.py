@@ -354,6 +354,42 @@ class TaskTracker:
                 return ok, {"custom": ok}, "Custom predicate satisfied." if ok else "Custom predicate failed."
             return True, {"custom": True}, "Custom verification passed."
 
+        # 7. Independent Fact Audit Verification
+        if v_type == "fact_audit":
+            audit_data = None
+            if after_state and "execution_res" in after_state and isinstance(after_state["execution_res"], dict):
+                audit_data = after_state["execution_res"].get("audit_result", after_state["execution_res"])
+            elif subgoal.result_evidence and "audit_result" in subgoal.result_evidence:
+                audit_data = subgoal.result_evidence["audit_result"]
+
+            if not audit_data:
+                return False, {}, "Audit not yet executed."
+
+            passed = bool(audit_data.get("audit_passed", False))
+            mismatches = audit_data.get("mismatches", [])
+            fields_count = audit_data.get("fields_audited", 0)
+            req_fields = spec.get("required_fields", [])
+            field_comps = audit_data.get("field_comparisons", {})
+
+            missing_reqs = [f for f in req_fields if f not in field_comps or not field_comps[f].get("match", False)]
+
+            if passed and not mismatches and fields_count > 0 and not missing_reqs:
+                evidence = {
+                    "audit_passed": True,
+                    "fields_audited": fields_count,
+                    "ground_truth_source": audit_data.get("ground_truth_source", "Win32/platform"),
+                    "field_comparisons": field_comps,
+                    "mismatches": [],
+                }
+                return True, evidence, f"Independent fact audit passed with 100% match across {fields_count} fields."
+
+            fail_reasons = []
+            if mismatches:
+                fail_reasons.append(f"mismatches={mismatches}")
+            if missing_reqs:
+                fail_reasons.append(f"unmatched_required_fields={missing_reqs}")
+            return False, audit_data, f"Fact audit failed: {'; '.join(fail_reasons)}"
+
         return False, {}, f"Unknown verification type: {v_type}"
 
     # ----------------------------------------------------------------
@@ -433,17 +469,18 @@ class TaskTracker:
                 WindowIdentifier.bring_to_front(pre_req_title)
                 time.sleep(0.5)
 
-        # Check if step is already accomplished
-        pre_done, pre_ev, _ = self.verify_subgoal(current_sg)
-        if pre_done:
-            print(f"[TaskTracker] ⏭️ Precheck: Step {current_sg.step_id} already satisfied. Skipping duplicate execution.")
-            current_sg.status = StepStatus.COMPLETED
-            current_sg.result_evidence = pre_ev
-            self.active_step_index += 1
-            if self.active_step_index >= len(self.sub_goals):
-                self.status = StepStatus.COMPLETED
-            self.save_checkpoint(f"Precheck verified step {current_sg.step_id}")
-            return True, f"Step {current_sg.step_id} already completed."
+        # Check if step is already accomplished (unless explicitly flagged to bypass precheck)
+        if not current_sg.precheck_spec.get("bypass_precheck", False):
+            pre_done, pre_ev, _ = self.verify_subgoal(current_sg)
+            if pre_done:
+                print(f"[TaskTracker] ⏭️ Precheck: Step {current_sg.step_id} already satisfied. Skipping duplicate execution.")
+                current_sg.status = StepStatus.COMPLETED
+                current_sg.result_evidence = pre_ev
+                self.active_step_index += 1
+                if self.active_step_index >= len(self.sub_goals):
+                    self.status = StepStatus.COMPLETED
+                self.save_checkpoint(f"Precheck verified step {current_sg.step_id}")
+                return True, f"Step {current_sg.step_id} already completed."
 
         # 2. ACTION_INTENT
         current_sg.status = StepStatus.IN_PROGRESS
@@ -474,7 +511,9 @@ class TaskTracker:
         # 4. POST_VERIFICATION
         time.sleep(0.4)
         after_frame = VisualVerifier.capture_frame()
-        after_state = {"frame": after_frame}
+        after_state = {"frame": after_frame, "execution_res": res}
+        if isinstance(res, dict) and "audit_result" in res:
+            after_state["audit_result"] = res["audit_result"]
 
         verified, evidence, v_msg = self.verify_subgoal(current_sg, before_state, after_state)
         print(f"[TaskTracker] Post-Verification: verified={verified} [{v_msg}]")

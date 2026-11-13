@@ -410,3 +410,4 @@ class AdaptiveReplanner:
 
         print(f"[AdaptiveReplanner] ➕ Injected Adaptation Step {new_step_id} to create '{missing_dir}' (Replan #{self.replan_count})")
         return True, adaptation_node, f"Injected step {new_step_id} to create missing directory."
+
