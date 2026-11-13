@@ -319,6 +319,45 @@ class VisualVerifier:
         msg = f"{delta}% screen delta detected" if has_changed else f"No significant screen change ({delta}% delta)"
         return has_changed, delta, msg
 
+    @classmethod
+    def wait_for_visual_settlement(
+        cls,
+        region: Optional[Tuple[int, int, int, int]] = None,
+        timeout: float = 1.5,
+        poll_interval: float = 0.08,
+        stability_threshold: float = 0.5,
+        required_stable_frames: int = 2,
+    ) -> Tuple[bool, float]:
+        """
+        Waits until dynamic UI elements (dropdowns, animations, autocomplete lists)
+        settle visually before proceeding with target grounding.
+        Returns (settled: bool, final_delta: float).
+        """
+        if not _IMAGING:
+            return True, 0.0
+
+        import time
+        t0 = time.monotonic()
+        prev_frame = cls.capture_frame()
+        stable_count = 0
+        last_delta = 100.0
+
+        while time.monotonic() - t0 < timeout:
+            time.sleep(poll_interval)
+            cur_frame = cls.capture_frame()
+            if prev_frame and cur_frame:
+                delta = cls.compute_difference_percentage(prev_frame, cur_frame, region=region)
+                last_delta = delta
+                if delta <= stability_threshold:
+                    stable_count += 1
+                    if stable_count >= required_stable_frames:
+                        return True, delta
+                else:
+                    stable_count = 0
+            prev_frame = cur_frame
+
+        return False, last_delta
+
 
 class WindowIdentifier:
     """
@@ -415,13 +454,118 @@ class WindowIdentifier:
             time.sleep(0.2)
         return False
 
+    @classmethod
+    def is_window_hung(cls, hwnd: int) -> bool:
+        """Checks if a window has stopped responding to Windows message loop."""
+        if platform.system() == "Windows" and hwnd:
+            try:
+                import ctypes
+                return bool(ctypes.windll.user32.IsHungAppWindow(hwnd))
+            except Exception:
+                pass
+        return False
+
+
+class WindowGeometryAnchor:
+    """
+    Anchors grounded physical coordinates to the window geometry observed at time t0.
+    Invalidates coordinates if the window is moved, resized, or minimized before execution.
+    """
+    _active_anchors: Dict[int, Tuple[int, int, int, int]] = {}
+
+    @classmethod
+    def register_anchor(cls, hwnd: int, rect: Tuple[int, int, int, int]) -> None:
+        """Registers the window bounding rect at observation time."""
+        if hwnd and rect:
+            cls._active_anchors[hwnd] = rect
+
+    @classmethod
+    def validate_anchor(cls, hwnd: int, tolerance_pixels: int = 5) -> Tuple[bool, str]:
+        """
+        Validates whether the window is still in the expected physical position.
+        Returns: (is_valid: bool, reason: str)
+        """
+        if not hwnd or hwnd not in cls._active_anchors:
+            return True, "No anchor registered"
+
+        expected_rect = cls._active_anchors[hwnd]
+        cur_info = WindowIdentifier.get_foreground_window_info()
+        if cur_info["hwnd"] != hwnd:
+            return False, f"Window focus changed (expected HWND {hwnd}, active {cur_info['hwnd']})"
+
+        cur_rect = cur_info["rect"]
+        if not cur_rect:
+            return False, "Window is minimized or has no valid geometry"
+
+        dx = abs(cur_rect[0] - expected_rect[0])
+        dy = abs(cur_rect[1] - expected_rect[1])
+        dw = abs(cur_rect[2] - expected_rect[2])
+        dh = abs(cur_rect[3] - expected_rect[3])
+
+        if max(dx, dy, dw, dh) > tolerance_pixels:
+            return False, (
+                f"Window geometry shifted (moved dx={dx}px, dy={dy}px, size change dw={dw}px, dh={dh}px). "
+                f"Coordinates invalidated."
+            )
+
+        return True, "Geometry verified"
+
+    @classmethod
+    def clear_anchor(cls, hwnd: Optional[int] = None) -> None:
+        if hwnd is not None:
+            cls._active_anchors.pop(hwnd, None)
+        else:
+            cls._active_anchors.clear()
+
+
+class DisambiguationGate:
+    """
+    Enforces the principle: Prefer asking / inquiring over clicking randomly
+    when multiple UI controls have similar or ambiguous labels.
+    """
+
+    @classmethod
+    def evaluate_candidates(
+        cls,
+        query: str,
+        candidates: List[Dict[str, Any]],
+        confidence_delta_threshold: float = 0.15,
+    ) -> Tuple[bool, Optional[Dict[str, Any]], str]:
+        """
+        Evaluates candidate detections for ambiguity.
+        Returns: (is_unambiguous: bool, selected_candidate: Optional[dict], reason: str)
+        """
+        if not candidates:
+            return False, None, f"No element matching '{query}' found."
+
+        if len(candidates) == 1:
+            return True, candidates[0], "Single unambiguous match."
+
+        sorted_cands = sorted(candidates, key=lambda c: c.get("confidence", 0.0), reverse=True)
+        top1 = sorted_cands[0]
+        top2 = sorted_cands[1]
+
+        score1 = top1.get("confidence", 1.0)
+        score2 = top2.get("confidence", 0.0)
+        delta = score1 - score2
+
+        if delta < confidence_delta_threshold:
+            labels = [c.get("label", str(c.get("id", ""))) for c in sorted_cands[:3]]
+            return (
+                False,
+                None,
+                f"Ambiguity detected: {len(candidates)} elements match '{query}' with close confidence ({score1:.2f} vs {score2:.2f}, labels: {labels}). Disambiguation required."
+            )
+
+        return True, top1, f"Top candidate selected with clear confidence margin ({delta:.2f})."
+
 
 class VisualGroundingGate:
     """
     Strict Visual Grounding Gate:
     Enforces Observe -> Understand -> Plan -> Act -> Verify.
-    Prevents blind coordinate execution and ensures every action is grounded
-    in a fresh, verified screen observation.
+    Prevents blind coordinate execution, rejects stale targets, checks responsiveness,
+    and ensures every action is grounded in a fresh, verified screen observation.
     """
 
     @classmethod
@@ -439,6 +583,34 @@ class VisualGroundingGate:
         return VisualVerifier.capture_frame()
 
     @classmethod
+    def validate_target_patch(
+        cls,
+        before_frame: Any,
+        fresh_frame: Any,
+        target_coords: Tuple[int, int],
+        patch_radius: int = 25,
+        max_patch_change: float = 35.0,
+    ) -> Tuple[bool, str]:
+        """
+        Verifies that the target visual element at (x, y) is still present and has not vanished or been obscured.
+        Returns: (is_present: bool, reason: str)
+        """
+        if before_frame is None or fresh_frame is None:
+            return True, "No reference frame provided"
+
+        x, y = target_coords
+        w, h = before_frame.size if hasattr(before_frame, "size") else (1920, 1080)
+        rx = max(0, min(w - patch_radius * 2, x - patch_radius))
+        ry = max(0, min(h - patch_radius * 2, y - patch_radius))
+        region = (rx, ry, patch_radius * 2, patch_radius * 2)
+
+        patch_delta = VisualVerifier.compute_difference_percentage(before_frame, fresh_frame, region=region)
+        if patch_delta > max_patch_change:
+            return False, f"Target at ({x}, {y}) changed significantly ({patch_delta:.1f}% delta). Target vanished or obscured."
+
+        return True, "Target patch intact"
+
+    @classmethod
     def validate_action(
         cls,
         action: str,
@@ -453,10 +625,21 @@ class VisualGroundingGate:
         if fresh_frame is None:
             return False, "Visual Grounding Gate: Screen capture unavailable. Cannot proceed blind.", None
 
-        # Check foreground window if a target application / title is specified
+        # 1. Check if foreground window is unresponsive (Scenario 7)
+        fw = WindowIdentifier.get_foreground_window_info()
+        if fw["hwnd"] and WindowIdentifier.is_window_hung(fw["hwnd"]):
+            return False, f"Visual Grounding Gate: Target application window '{fw['title']}' is unresponsive (IsHungAppWindow=True).", fresh_frame
+
+        # 2. Check Window Geometry Anchor if registered (Scenario 2)
+        target_hwnd = params.get("hwnd") or (fw["hwnd"] if params.get("enforce_anchor") else None)
+        if target_hwnd:
+            geom_valid, geom_reason = WindowGeometryAnchor.validate_anchor(target_hwnd)
+            if not geom_valid:
+                return False, f"Visual Grounding Gate: {geom_reason}", fresh_frame
+
+        # 3. Check foreground window if a target application / title is specified (Scenario 4)
         target_title = params.get("title") or params.get("target_app")
         if target_title:
-            fw = WindowIdentifier.get_foreground_window_info()
             if target_title.lower() not in fw["title"].lower():
                 # Attempt short wait for window focus
                 found = WindowIdentifier.wait_for_target_window(target_title, timeout=1.5)
@@ -464,7 +647,15 @@ class VisualGroundingGate:
                     fw_now = WindowIdentifier.get_foreground_window_info()
                     return False, f"Target window '{target_title}' is not active (active: '{fw_now['title']}'). Cannot interact blindly.", fresh_frame
 
-        # Reject ungrounded blind clicks (actions requiring target where neither coordinates nor description provided)
+        # 4. Check target patch presence if reference frame provided (Scenario 1)
+        ref_frame = params.get("ref_frame")
+        if ref_frame is not None and (params.get("x") is not None and params.get("y") is not None):
+            px, py = int(params["x"]), int(params["y"])
+            patch_valid, patch_reason = cls.validate_target_patch(ref_frame, fresh_frame, (px, py))
+            if not patch_valid:
+                return False, f"Visual Grounding Gate: {patch_reason}", fresh_frame
+
+        # 5. Reject ungrounded blind clicks (actions requiring target where neither coordinates nor description provided)
         if action in ("click", "double_click", "right_click", "drag"):
             desc = params.get("description")
             x, y = params.get("x"), params.get("y")

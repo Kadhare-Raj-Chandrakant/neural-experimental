@@ -575,7 +575,17 @@ def computer_control(
 
                 res = computer_control(step, player=player)
                 executed += 1
-                if vsm.cancellation_event.wait(timeout=0.05):
+
+                # Stop compound chain if step was blocked by safety or grounding gate
+                if isinstance(res, str) and ("Action blocked" in res or "rejected" in res):
+                    return f"Compound action aborted at step {idx}/{len(steps)}: {res}"
+
+                # Scenario 6: Zero-delta failure check if step requested verification
+                if step.get("verify") and isinstance(res, str) and "No significant screen change" in res:
+                    return f"Compound action aborted at step {idx}/{len(steps)}: Zero visual delta detected."
+
+                # Scenario 8: Emergency Stop check
+                if vsm.cancellation_event.wait(timeout=0.05) or vsm.is_paused:
                     return f"Compound action interrupted after step {executed}/{len(steps)} by Emergency Stop."
 
             return f"Executed {executed} compound steps successfully."
