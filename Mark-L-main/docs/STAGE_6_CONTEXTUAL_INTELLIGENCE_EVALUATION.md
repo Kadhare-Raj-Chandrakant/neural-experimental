@@ -147,4 +147,4 @@ As required by engineering governance, the following three explicit limitations 
 | **Stage 3 — Multi-Application Generalization** | Notepad, File Explorer, Browser; 50-frame stress test & latency profiling | **Frozen** | `58b4a71` |
 | **Stage 4 — Reliability & Adversarial Testing** | 8 adversarial failure modes; stale targets, geometry shifts, hung apps, 156 ms stop | **Frozen** | `936e757` |
 | **Stage 5 — Long-Horizon Task Execution** | Persistent state, sub-goal tracking, crash reconciliation, holistic verification | **Frozen** | `cb20df3` |
-| **Stage 6 — Contextual Intelligence & Adaptive Planning** | Autonomous goal decomposition, DAG dependency invalidation, bounded replanning, Goal Invariance Gate | **Pending Review** | Pending Authorization |
+| **Stage 6 — Contextual Intelligence & Adaptive Planning** | Autonomous goal decomposition, DAG dependency invalidation, bounded replanning, Goal Invariance Gate | **Accepted** | `f6764f0` |

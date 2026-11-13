@@ -35,7 +35,7 @@ All milestone transitions, architectural updates, and evaluation reports are rec
 ---
 
 ## [Stage 6] — Contextual Intelligence & Adaptive Task Planning
-* **Status:** PENDING REVIEW (Corrections checkpoint)
+* **Status:** ACCEPTED (`f6764f0`)
 * **Scope:** Autonomous goal decomposition, DAG dependency invalidation, bounded adaptive replanning (`AdaptiveReplanner`), task-scoped `DesktopRelationshipGraph`, and `GoalInvarianceGate` across Benchmarks 6A–6D.
 
 ---
@@ -121,4 +121,5 @@ Do not declare Stage 6 Frozen. Return the evidence for architectural review and 
 #### 5. Deliverables & Git Checkpoint
 * Files Modified: `Mark-L-main/actions/task_tracker.py`, `Mark-L-main/tests/test_stage_6_benchmarks.py`, `Mark-L-main/docs/STAGE_6_CONTEXTUAL_INTELLIGENCE_EVALUATION.md`, `Mark-L-main/docs/CHANGELOG.md`.
 * Checkpoint Commit: Pushed to `main`.
-* Stage 6 Status: Pending architectural review and formal authorization (not declared frozen).
+* Stage 6 Status: ACCEPTED at checkpoint f6764f0; formal freeze pending final baseline confirmation.
+
