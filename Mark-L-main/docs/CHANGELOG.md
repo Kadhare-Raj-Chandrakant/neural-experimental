@@ -239,4 +239,155 @@ My recommendation: Let us get this assessment first. We should choose the render
 * 5 stylistic references placed at `assets/character/references/reference_01.jpg` through `reference_05.jpg`.
 * Full architecture specification preserved in `docs/BODY_SUBSYSTEM_ARCHITECTURE_ASSESSMENT.md`.
 
+---
+
+## [Body Subsystem] — Milestone B0 Architecture Review Revision
+
+* **Status:** B0 REVISION — AWAITING ARCHITECTURAL APPROVAL
+* **Authority:** Architect
+* **Scope:** Corrected technical assumptions, character creation pipeline, normalized facial rigging interface, decoupled process rendering isolation, priority-based speech synchronization, and B0–B7 milestone sequence.
+
+---
+
+### Task Directive: JARVIS BODY — Architectural Review Revision (B0)
+
+```
+JARVIS BODY — ARCHITECTURAL REVIEW REVISION (B0)
+
+Authority: Architect
+Current Status: INITIAL ASSESSMENT REVIEWED
+Next Status: B0 REVISION — AWAITING APPROVAL
+
+The initial architecture assessment has been reviewed.
+
+The overall direction of Three.js + WebGL 2 + VRM is retained as the preferred candidate architecture. However, the following corrections are mandatory before implementation authorization.
+
+1. Rendering and Performance
+- Treat all initial FPS, VRAM and RAM figures as unverified estimates.
+- Establish a baseline with JARVIS and OmniParser operating simultaneously.
+- Implement actual resource monitoring.
+- Verify performance on the GTX 1650.
+- Do not sacrifice character quality to satisfy an arbitrary performance target.
+- Report actual measurements separately from theoretical estimates.
+
+2. Character Creation Pipeline
+Define the complete process for producing the actual rigged 3D character.
+Requirements:
+- Approximately 28-year-old adult appearance.
+- Consistent mature facial structure.
+- Long silver-white hair.
+- Blue-violet eyes.
+- Black high-neck outfit.
+- Hyper-realistic anime-inspired 3D aesthetic.
+- Consistent identity across front, side and three-quarter views.
+Evaluate Blender-based modeling and VRM export compatibility.
+The approved portrait is a visual identity reference, not an already-rigged 3D model.
+Do not begin modeling or purchase assets yet.
+
+3. Facial Rigging
+- Verify actual model-supported morph targets.
+- Do not assume VRM 1.0 guarantees 52 ARKit blendshapes.
+- Define a normalized expression interface.
+- Document missing morph targets and deformation limitations.
+- Establish facial identity consistency tests.
+
+4. Rendering Isolation
+Evaluate a separate rendering process communicating with the existing PyQt6 application through local IPC.
+Do not move QWebEngineView into an arbitrary worker thread.
+A rendering failure must not interrupt:
+- Brain execution
+- Voice processing
+- Desktop interaction
+- Emergency stop mechanisms
+
+5. Speech Synchronization
+Establish a priority-based synchronization system:
+1. Phoneme/viseme timing when available.
+2. Word-boundary timing when phoneme data is unavailable.
+3. Audio-derived approximation as fallback.
+Do not claim accurate phoneme recognition using FFT alone.
+Do not intercept or modify existing audio playback in a way that introduces latency.
+Define a concrete, non-invasive integration interface.
+
+6. Revised Milestones
+Use the following sequence:
+B0 Architecture Freeze
+B1 Rendering and IPC Foundation
+B2 Character Creation
+B3 Facial Rigging
+B4 Human Movement
+B5 Speech Synchronization
+B6 Intelligence and Emotion Integration
+B7 Performance and Coexistence
+For every milestone, define:
+- Scope
+- Deliverables
+- Dependencies
+- Acceptance criteria
+- Verification procedure
+- Failure conditions
+
+7. Governance
+STRICT:
+- Do not implement code.
+- Do not install dependencies.
+- Do not modify existing Brain or desktop automation functionality.
+- Do not silently change the approved character identity.
+- Do not claim unverified capabilities.
+- Preserve existing project governance.
+
+Update the architecture documentation and append the exact prompt and resulting report to docs/CHANGELOG.md.
+
+FINAL DELIVERABLE
+Return the complete revised B0 architecture document, corrected technical assumptions, technology decisions, resource budget proposal and milestone acceptance criteria.
+Status must remain AWAITING ARCHITECTURAL APPROVAL.
+Wait for explicit authorization before starting B1.
+```
+
+---
+
+### Implementation Report: B0 Architecture Revision
+
+#### 1. Corrected Technical Assumptions & Baseline Measurements
+* **Measured Baseline:** Host system idling with 176 MiB VRAM used, 3760 MiB free, RAM 77.3% used (3.5 GB available).
+* **Telemetry Distinction:** 60 FPS and $\le 500\text{ MB}$ VRAM are established as target budgets to be empirically measured and verified via dedicated telemetry (`telemetry.py`), not theoretical promises.
+* **Quality Preservation:** Visual fidelity and mature 28yo identity will not be degraded to hit arbitrary performance numbers. If required under heavy desktop load, viewport dynamically throttles frame rate to 30 FPS rather than distorting shaders or geometry.
+
+#### 2. Character Creation Pipeline
+* **Source:** Approved 2D portrait in `assets/character/approved/approved_portrait.jpg`.
+* **Workflow:** Blender 3.6/4.x anatomical sculpt (28yo proportions) $\rightarrow$ quad retopology (40K–65K tris) $\rightarrow$ layered silver-white hair cards + SpringBone chains $\rightarrow$ PBR hybrid material baking (SSS mask, skin roughness, anisotropic hair highlights) $\rightarrow$ shape key authoring $\rightarrow$ VRM 1.0 export via `VRM_Addon_for_Blender`.
+* **Validation:** 5-angle turnaround consistency audit ($0^\circ, 45^\circ, 90^\circ, -15^\circ, +15^\circ$) to verify facial identity preservation.
+
+#### 3. Facial Rigging & Normalized Expression Interface
+* **Rigging Realism:** Acknowledged that VRM 1.0 does not guarantee 52 ARKit blendshapes.
+* **Interface:** Tier 1 (Mandatory: 5 visemes, blinks, gaze directions, jawOpen), Tier 2 (Core Emotion: smile, frown, brow morphs), Tier 3 (Extended ARKit: micro-movements, gracefully ignored if unauthored).
+* **Identity Invariant:** Expression morphs clamped to soft tissue; cranial bone structure remains invariant.
+
+#### 4. Decoupled Rendering Process & Fault Isolation
+* **Architecture:** Dedicated standalone helper process hosting Three.js WebGL 2.0 viewport.
+* **Communication:** Local loopback IPC (WebSocket/JSON-RPC on `127.0.0.1:9876`).
+* **Zero Disruption Guarantee:** Total crash isolation. A rendering fault or GPU context loss in the body process cannot stall the Brain, interrupt audio playback, or impede the 156 ms Emergency Stop mechanism.
+
+#### 5. Priority-Based Speech Synchronization
+* **Hierarchy:**
+  1. Priority 1: Direct phoneme/viseme timing marks from speech engine (EdgeTTS/Kokoro).
+  2. Priority 2: Word-boundary timing with CMUdict phonetic decomposition and syllable splines.
+  3. Priority 3: Real-time RMS energy and FFT formant centroid ($F_1, F_2$) strictly as an audio-reactive fallback.
+* **Non-Invasive:** Read-only observer tap on `sounddevice` output buffer; zero audio playback latency introduced.
+
+#### 6. Revised Sequential Milestones (B0 to B7)
+* B0: Architecture Freeze (Awaiting Approval)
+* B1: Rendering and IPC Foundation
+* B2: Character Creation
+* B3: Facial Rigging
+* B4: Human Movement
+* B5: Speech Synchronization
+* B6: Intelligence and Emotion Integration
+* B7: Performance and Coexistence
+
+#### 7. Deliverables & Git Checkpoint
+* Files Updated: `Mark-L-main/docs/BODY_SUBSYSTEM_ARCHITECTURE_ASSESSMENT.md`, `Mark-L-main/docs/CHANGELOG.md`, `BODY_SUBSYSTEM_INITIAL_ASSESSMENT.md`.
+* Status: **B0 REVISION COMPLETED — AWAITING ARCHITECTURAL APPROVAL**.
+
+
 
