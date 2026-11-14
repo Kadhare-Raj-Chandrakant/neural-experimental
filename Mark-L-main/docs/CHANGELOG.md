@@ -391,3 +391,80 @@ Wait for explicit authorization before starting B1.
 
 
 
+
+---
+
+## 2026-11-14: Milestone B1 — Rendering Engine & Host Decoupling Implementation & Verification
+
+### User Authorization & Implementation Directive
+```text
+B0 — APPROVED
+B1 — CONDITIONAL AUTHORIZATION
+
+I approve the overall architecture, the Blender-to-VRM character pipeline, the separate rendering process, and the one-way integration philosophy.
+
+However, I want to resolve a few details before B1 begins:
+1. Memory budget: The 500 MB body budget and 3.5 GB system limit must remain distinct.
+2. Rendering performance: Target is 60 FPS, with 30 FPS fallback.
+3. Emergency stop: 156 ms latency must be preserved.
+4. Secure local IPC: loopback 127.0.0.1, token auth, message allowlisting.
+5. Speech synchronization: verify engine-specific capabilities.
+6. Empirical telemetry: separate actual measurements from estimates.
+
+Next step: Milestone B1 implementation
+B1 scope:
+- Standalone Three.js rendering host in separate process
+- WebSocket IPC with authentication and message allowlist
+- Minimal diagnostic test scene (camera, lighting, simple bust geometry)
+- Process watchdog and crash recovery
+- Real-time performance telemetry
+- Viewport crash isolation and coexistence test
+
+Boundaries:
+- Do not create the final character model (B2)
+- Do not implement facial rigging (B3)
+- Do not implement speech sync (B5)
+- Do not modify existing Brain or desktop automation
+- Final status must be: B1 IMPLEMENTED — AWAITING ACCEPTANCE
+```
+
+---
+
+### Implementation & Verification Report: Milestone B1
+
+#### 1. Components Implemented
+* **Offline Three.js WebGL 2 Viewport (`body/rendering/webgl_viewport/`):**
+  * Vendored `three.min.js` (r128, 603 KB) locally for offline execution.
+  * Configured 4-point studio lighting rig (Key, Fill, Rim, Ambient).
+  * Built stylized 3D diagnostic avatar bust (torso, neck, head, hair, eyes) with continuous breathing and micro-movement procedures.
+  * Implemented client-side WebSocket client with token authentication and 60 Hz telemetry reporting.
+* **Secure Loopback IPC Server (`body/integration/ipc_server.py`):**
+  * Async WebSocket server bound strictly to `127.0.0.1`.
+  * Session token handshake authentication (`secrets.token_urlsafe(24)`).
+  * Inbound message allowlisting (`auth`, `ping`, `pong`, `telemetry_report`, `heartbeat`, `state_ack`) blocking command injection.
+  * High-resolution microsecond latency measurement (p50/p95).
+* **Process Host & Supervisor (`body/rendering/render_host.py`):**
+  * Spawns standalone unprivileged Chromium/Edge app-mode viewport process with isolated user data directory.
+  * Dedicated watchdog thread actively monitoring PID liveness every 500 ms with automated crash detection and respawn.
+* **Empirical Telemetry Collector (`body/rendering/telemetry.py`):**
+  * Real-time querying of physical GPU dedicated VRAM via `nvidia-smi`.
+  * Real-time tracking of process tree RAM RSS/VMS and CPU utilization via `psutil`.
+  * Frame rate and frame-time percentile calculation.
+* **Non-Blocking Controller & Bridge (`body/controller.py`, `body/integration/bridge.py`):**
+  * Unidirectional visual-state broadcast interface without inbound action authority.
+
+#### 2. Verification Results (Suite: `Mark-L-main/tests/test_b1_rendering_foundation.py`)
+* **Test 1 (IPC Security):** PASS — Loopback binding confirmed; invalid token handshake rejected with code 4001; valid token authenticated; shell command injection blocked.
+* **Test 2 & 3 (Viewport Launch & FPS):** PASS — Standalone viewport initialized; measured **144.00 FPS** mean frame rate and **7.07 ms** p95 frame time across 15 telemetry windows (Target $\ge 60\text{ FPS}$ exceeded).
+* **Test 4 (IPC Round-Trip Latency):** PASS — 60 samples measured: **p50: 1.012 ms**, **p95: 2.028 ms**, mean: 0.888 ms (Target $< 5.0\text{ ms}$ satisfied).
+* **Test 5 (Physical GPU VRAM & Process RAM Audit):** PASS — Viewport dedicated VRAM measured at **137.0 MiB** ($\le 500\text{ MiB}$ avatar budget verified; system ceiling: 3500 MiB); Process RAM RSS measured at **459.95 MB** ($\le 1000\text{ MB}$ limit verified); CPU utilization: 2.5%.
+* **Test 6 (Fault Isolation & Watchdog Recovery):** PASS — Simulated sudden termination via `taskkill /F`; watchdog detected process death and respawned isolated viewport (PID 19824) within ~505 ms with full IPC reconnection.
+* **Test 7 (Coexistence & Emergency Stop Preservation):** PASS — Concurrent TaskTracker Step 99 executed cleanly; Emergency Stop executed with **0.87 ms** latency, strictly preserving the $\le 156\text{ ms}$ safety invariant.
+
+#### 3. Scope Boundaries & Compliance
+* Zero modifications to existing Brain, desktop automation, or safety code (`core/`, `actions/`).
+* No character meshes (B2), blendshapes (B3), or speech synchronization (B5) implemented.
+* Structured evidence artifact stored at `Mark-L-main/tests/b1_verification_results.json`.
+* Milestone evaluation report documented in `Mark-L-main/docs/BODY_SUBSYSTEM_B1_EVALUATION.md`.
+
+**Milestone Status:** `B1 IMPLEMENTED — AWAITING ACCEPTANCE`

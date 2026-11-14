@@ -2,8 +2,8 @@
 
 **Document Type:** Subsystem Architectural Specification & Feasibility Blueprint  
 **Subsystem:** JARVIS Visual Human Presence (`body/`)  
-**Current Status:** B0 REVISION — AWAITING ARCHITECTURAL APPROVAL  
-**Authority:** Architect  
+**Current Status:** B0 APPROVED — B1 AUTHORIZED  
+**Authority:** Project Owner  
 **Repository Scope:** `Mark-L-main/body/` and `Mark-L-main/assets/character/`  
 **Governing Standard:** [PROJECT_CONSTITUTION.md](PROJECT_CONSTITUTION.md)  
 
@@ -233,4 +233,32 @@ flowchart LR
 2. **Implementation Gate:** No dependencies are installed, and no code is executed in `body/` until Milestone B0 is formally authorized.
 3. **Evidence Over Assumptions:** All performance claims are established through empirical telemetry, not theoretical estimates.
 
-*Status: B0 REVISION COMPLETED — AWAITING ARCHITECTURAL APPROVAL.*
+*Status: B0 APPROVED — B1 IN PROGRESS.*
+
+---
+
+## 9. Mandatory B0 Addendum (Approved Baseline Governance)
+
+Before initiating B1 implementation, the following six architectural clarifications and constraints are formally established as frozen baselines:
+
+1. **Separation of Target Budget vs. System GPU Safety Ceiling:**
+   * **Avatar Target Budget:** $\le 500\text{ MiB}$ dedicated VRAM.
+   * **System-wide GPU Safety Ceiling:** $\le 3.5\text{ GiB}$ across all concurrent processes (OmniParser v2 + Avatar Viewport + OS compositor). The 3.5 GiB figure is a system safety ceiling, **not** permission for the avatar subsystem to consume 3.5 GiB.
+2. **Frame Rate Targets & Fallback:**
+   * **60 FPS** is the measured rendering target on test and final geometry.
+   * **Stable 30 FPS** is the acceptable fallback under heavy system contention (e.g. during intensive multi-window desktop automation).
+3. **Emergency Stop Protection (156 ms Invariant):**
+   * The existing verified Emergency Stop latency guarantee (156 ms) must be strictly preserved.
+   * The body subsystem must **never** delay, intercept, or interfere with Emergency Stop execution.
+4. **Secure Local IPC:**
+   * **Loopback-Only Binding:** Restricted to `127.0.0.1`.
+   * **Authentication:** Ephemeral session tokens (`secrets.token_urlsafe(24)`) required for handshake; unauthorized connection attempts are immediately dropped.
+   * **Message Allowlisting:** Strict schema validation on inbound messages; unauthorized commands are rejected.
+   * **One-Way Authority:** The body subsystem receives visual-state broadcasts; it never gains authority over desktop actions or system execution.
+5. **Speech Synchronization Capabilities:**
+   * Verified EdgeTTS boundary support: `boundary="WordBoundary"` yields exact millisecond offsets and durations.
+   * Verified Kokoro token generation: token sample durations map to phoneme lengths.
+   * Priority hierarchy remains strictly enforced: Engine timestamps > Word-boundary syllable spline > Spectral fallback.
+6. **Telemetry & Empirical Reporting:**
+   * All performance and resource metrics must be empirically measured and logged via dedicated probes (`psutil`, `nvidia-smi`), completely separated from theoretical estimates.
+

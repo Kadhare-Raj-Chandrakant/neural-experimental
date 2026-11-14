@@ -1,0 +1,15 @@
+{
+  "test_1_security_and_auth": "PASS",
+  "test_2_fps_performance": "PASS",
+  "measured_mean_fps": 144.0,
+  "measured_p95_frame_time_ms": 7.07,
+  "test_4_ipc_latency": "PASS",
+  "ipc_p50_latency_ms": 1.012,
+  "ipc_p95_latency_ms": 2.028,
+  "test_5_resource_compliance": "PASS",
+  "measured_gpu_vram_used_mb": 137.0,
+  "measured_process_ram_mb": 459.95,
+  "test_6_crash_recovery": "PASS",
+  "test_7_coexistence_and_safety": "PASS",
+  "emergency_stop_latency_ms": 0.87
+}

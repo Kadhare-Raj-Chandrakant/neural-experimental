@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS — 3D Body Viewport (B1 Diagnostic)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #01080f; /* Deep dark blue-black backdrop matching JARVIS UI */
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      user-select: none;
+    }
+    #viewport-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #telemetry-overlay {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(1, 15, 24, 0.85);
+      border: 1px solid #1a5c7a;
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: #8ffcff;
+      font-size: 11px;
+      line-height: 1.5;
+      pointer-events: none;
+      backdrop-filter: blur(4px);
+    }
+    .hud-title {
+      color: #00d4ff;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .hud-val {
+      color: #ffffff;
+      font-weight: bold;
+    }
+    .status-ok { color: #00ff88; }
+    .status-warn { color: #ffcc00; }
+  </style>
+</head>
+<body>
+  <div id="telemetry-overlay">
+    <div class="hud-title">JARVIS Body Subsystem (B1)</div>
+    <div>IPC Status: <span id="ipc-status" class="status-warn">Connecting...</span></div>
+    <div>FPS: <span id="hud-fps" class="hud-val">0.0</span></div>
+    <div>Frame Time: <span id="hud-ft" class="hud-val">0.0 ms</span> (p95: <span id="hud-p95" class="hud-val">0.0 ms</span>)</div>
+    <div>State: <span id="hud-state" class="hud-val">INITIALIZING</span></div>
+  </div>
+  <canvas id="viewport-canvas"></canvas>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="viewport.js"></script>
+</body>
+</html>
